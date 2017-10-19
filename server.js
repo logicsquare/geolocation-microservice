@@ -12,10 +12,11 @@ app.use(bodyParser.json())
 
 app.post("/location", (req, res) => {
   const timeOutInMinutes = req.body.timeout || 10 // 10 mins is default
-  const timeOutStamp = addMinutes(Date.now(), timeOutInMinutes).valueOf
+  const timeOutStamp = addMinutes(Date.now(), timeOutInMinutes).valueOf()
   if (!req.body.lng || !req.body.lat || !req.body.id) {
     return res.status(400).send("MISSING MANDATORY FIELDS IN REQUEST BODY")
   }
+  console.log(req.body.lng, req.body.lat, req.body.id);
   redis.geoadd("driver:locations", req.body.lng, req.body.lat, `id:${req.body.id}`, (err) => {
     if (err) { return res.status(500).send("LOCATION NOT SAVED") }
     redis.zadd("drivers:activeuntill", timeOutStamp, `id:${req.body.id}`) // no waiting!!
@@ -29,14 +30,13 @@ app.get("/near", (req, res) => {
   const radius = req.query.radius || 7 // eslint-disable-line prefer-destructuring
   const unit = req.query.unit || "km" // eslint-disable-line prefer-destructuring
 
+
   // First, find all inactive drivers:
-  redis.zrangebyscore("drivers:activeuntill", "-inf", Date.now(), (err0, inactives) => [
+  redis.zrangebyscore("drivers:activeuntill", "-inf", Date.now(), (err0, inactives) => {
     // Next, remove all those inactive drivers from geolocations
     redis.zrem("drivers:locations", ...inactives, (err1) => {
       if (err1) {
-        console.log("ERR1: ", err1.message)
-        res.status(500).send("COULD NOT FIND LOCATIONS")
-        return
+        console.log("ERR1: ", err1) // but don't stop execution!!
       }
       // ...And, for good measures, from the `activeuntill` zset as well
       redis.zremrangebyscore("drivers:activeuntill", "-inf", Date.now()) // but no waiting!!
@@ -50,7 +50,7 @@ app.get("/near", (req, res) => {
         return res.json(locations)
       })
     })
-  ])
+  })
 })
 
 app.listen(3000, () => {
