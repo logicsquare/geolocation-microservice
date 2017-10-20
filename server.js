@@ -11,7 +11,7 @@ app.use(bodyParser.json())
 
 
 app.post("/location", (req, res) => {
-  const timeOutInMinutes = req.body.timeout || 10 // 10 mins is default
+  const timeOutInMinutes = req.body.timeout || 10 // minimum 10 mins is default
   const timeOutStamp = addMinutes(Date.now(), timeOutInMinutes).valueOf()
   if (!req.body.lng || !req.body.lat || !req.body.id) {
     return res.status(400).send("MISSING MANDATORY FIELDS IN REQUEST BODY")
@@ -19,7 +19,7 @@ app.post("/location", (req, res) => {
   console.log(req.body.lng, req.body.lat, req.body.id);
   redis.geoadd("driver:locations", req.body.lng, req.body.lat, `id:${req.body.id}`, (err) => {
     if (err) { return res.status(500).send("LOCATION NOT SAVED") }
-    redis.zadd("drivers:activeuntill", timeOutStamp, `id:${req.body.id}`) // no waiting!!
+    redis.zadd("driver:activeuntill", timeOutStamp, `id:${req.body.id}`) // no waiting!!
     return res.status(200).send("OK")
   })
 })
@@ -31,22 +31,24 @@ app.get("/near", (req, res) => {
   const unit = req.query.unit || "km" // eslint-disable-line prefer-destructuring
 
 
-  // First, find all inactive drivers:
-  redis.zrangebyscore("drivers:activeuntill", "-inf", Date.now(), (err0, inactives) => {
-    // Next, remove all those inactive drivers from geolocations
-    redis.zrem("drivers:locations", ...inactives, (err1) => {
+  // First, find all inactive :
+  redis.zrangebyscore("driver:activeuntill", "-inf", Date.now(), (err0, inactives) => {
+    console.log("Inactives: ", inactives);
+    // Next, remove all those inactive  from geolocations
+    redis.zrem("driver:locations", ...inactives, (err1) => {
       if (err1) {
-        console.log("ERR1: ", err1) // but don't stop execution!!
+        // Note: it WIIL throw an error if there are no inactive drivers (ERR: wrong no of args for ZREM)...
+        console.log("ERR1: ", err1) // ...but don't stop execution for that!!
       }
       // ...And, for good measures, from the `activeuntill` zset as well
-      redis.zremrangebyscore("drivers:activeuntill", "-inf", Date.now()) // but no waiting!!
+      redis.zremrangebyscore("driver:activeuntill", "-inf", Date.now()) // but no waiting!!
       // Now the main task: geolocations!
       redis.georadius("driver:locations", myLng, myLat, radius, unit, (err2, locations) => {
         if (err2) {
           console.log("ERR1: ", err2.message)
           return res.status(500).send("COULD NOT FIND LOCATIONS")
         }
-        console.log(locations)
+        console.log("Nearby Locations: ", locations)
         return res.json(locations)
       })
     })
