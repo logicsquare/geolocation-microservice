@@ -1,0 +1,120 @@
+<html>
+<head>
+  <!-- Latest compiled and minified CSS & JS -->
+  <link rel="stylesheet" media="screen" href="//netdna.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+</head>
+<body>
+  
+  <div class="container text-center" style="margin-top: 3em;">
+    <div class="row">
+    <h3>Find Transports which matches the following criteria:</h3>
+    <hr/>
+    <label>
+      Within a radius of <input type="text" class="form-control input-sm" id="radius" value="7" />&nbsp;
+      <select class="form-control input-sm" id="unit">
+        <option selected>km</option>
+        <option>m</option>
+        <option>ft</option>
+        <option>mi</option>
+      </select>&nbsp;
+      from 
+      Latitude <input type="text" class="form-control input-sm" id="lat" value="22.5726" />&nbsp;&amp;&nbsp;
+      Longitude <input type="text" class="form-control input-sm" id="lng" value="88.3639" />
+    </label>
+    <br/>
+    <br/>
+    <button type="button" class="disable-while-talking btn btn-large btn-info" onclick="fetchData(renderTemplate);">FIND</button>
+    <br/>
+    <br/>
+    <hr/>
+    <br/>
+    <br/>
+    <!-- Radius: <input type="text" id="us3-radius"/> -->
+    </div>
+    <div class="row">
+      
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Driver ID</th>
+            <th>Location 
+            <span class="badge badge-info">LIVE!</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="target">
+        </tbody>
+      </table>
+      
+    </div>
+
+  </div>
+
+  <script id="template" type="x-tmpl-mustache">
+    {{#drivers}}
+    <tr>
+      <td> {{id}} </td>}
+      <td data-driver-id="{{.}}">Lat: {{lat}}; Lng: {{lng}}</td>
+    </tr>
+    {{/drivers}}
+  </script>
+
+  <script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>
+  <script src="https://cdn.rawgit.com/janl/mustache.js/b283da5c/mustache.js"></script>
+  <script src="//netdna.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src='http://maps.google.com/maps/api/js? sensor=false&libraries=places&key=AIzaSyBfXwliPdMdFFkPNRGQByETe4sn-x06X_4'></script>
+  <script src="https://cdn.rawgit.com/Logicify/jquery-locationpicker-plugin/fac86581/dist/locationpicker.jquery.min.js"></script>
+  <script type="text/javascript" src="http://localhost:3000/faye/client.js">
+  </script>
+  <script>
+    var faye = new Faye.Client('http://localhost:3000/faye');
+    var subscriptions = {};
+
+    var template = $('#template').html();
+    Mustache.parse(template);   // optional, speeds up future uses
+
+    function fetchData(cb) {
+      console.log(subscriptions);
+      $(".disable-while-talking").prop("disabled", true)
+      var lat = $("#lat").val()
+      var lng = $("#lng").val()
+      var radius = $("#radius").val()
+      var unit = $("#unit").val()
+      $.ajax({
+        method: "GET",
+        dataType: "json",
+        url: `http://localhost:3000/near?lat=${lat}&lng=${lng}&radius=${radius}&unit=${unit}`,
+        success: function (data) {
+          console.log(data);
+          $(".disable-while-talking").prop("disabled", false)
+          // Object.keys(subscriptions).forEach(id => subscriptions[id].cancel())
+          // subscriptions = {}
+          data.forEach((id) => {
+            // id = id.split(":")[1]
+            var s = faye.subscribe("/location/" + id, handleMessage)
+            subscriptions[id] = s
+          })
+          cb(data)
+        },
+        error: function () {
+          console.log("OOOOPPPPPSSSS..........Network error!");
+          $(".disable-while-talking").prop("disabled", false)
+        }
+      })
+    }
+
+    function renderTemplate(data) {
+      var rendered = Mustache.render(template, { drivers: data });
+      $("#target").html(rendered)
+    }
+
+    function handleMessage(message) { // faye subscription msg
+      console.log("handling msg.........");
+      $(`td[data-driver-id='${message.id}']`).html(`Lat: ${message.lat}; Lng: ${message.lng}`)
+    }
+
+     // at load / dom ready.......
+     fetchData(renderTemplate);
+  </script>
+</body>
+</html>

@@ -61,6 +61,10 @@ app.get("/near", (req, res) => {
   const radius = req.query.radius || 7 // eslint-disable-line prefer-destructuring
   const unit = req.query.unit || "km" // eslint-disable-line prefer-destructuring
 
+  console.log("**********", myLat, myLng, radius, unit);
+  if (!myLat || !myLng) {
+    return res.status(400).send("MISSING MANDATORY FIELDS `lat` & `lng`") 
+  }
 
   // First, find all inactive :
   redis.zrangebyscore("driver:activeuntill", "-inf", Date.now(), (err0, inactives) => {
@@ -74,13 +78,19 @@ app.get("/near", (req, res) => {
       // ...And, for good measures, from the `activeuntill` zset as well
       redis.zremrangebyscore("driver:activeuntill", "-inf", Date.now()) // but no waiting!!
       // Now the main task: geolocations!
-      redis.georadius("driver:locations", myLng, myLat, radius, unit, (err2, locations) => {
+      redis.georadius("driver:locations", myLng, myLat, radius, unit, "WITHCOORD", (err2, locations) => {
         if (err2) {
           console.log("ERR1: ", err2.message)
           return res.status(500).send("COULD NOT FIND LOCATIONS")
         }
         console.log("Nearby Locations: ", locations)
-        return res.json(locations)
+        return res.json(locations.map((l) => {
+          return {
+            id: l[0].split(":")[1],
+            lng: l[1][0],
+            lat: l[1][1]
+          }
+        }))
       })
     })
   })

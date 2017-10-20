@@ -35,7 +35,7 @@
       faye.publish("/heartbeat/" + $('#us3-id').val(), { timestamp: Date.now() })
     }, 60 * 1000)
 
-    $('#us3').locationpicker({
+    var mapOpts = {
       location: {
         latitude: 22.5726,
         longitude: 88.3639
@@ -51,7 +51,7 @@
       onchanged: function (currentLocation, radius, isMarkerDropped) {
         if (isMarkerDropped) {
           console.log("marker Drooped....");
-          faye.publish('/location/' + $('#us3-id').val(), { lng: $('#us3-lon').val(), lat: $('#us3-lat').val()  });
+          faye.publish('/location/' + $('#us3-id').val(), { id: $('#us3-id').val(), lng: $('#us3-lon').val(), lat: $('#us3-lat').val() });
         }
         // $.ajax({
         //   method: "POST",
@@ -63,13 +63,20 @@
         //   }
         // })
       }
-    });
+    }
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(geoPos) {
+          console.log(geoPos.coords);
           $('#us3-lon').val(geoPos.coords.longitude)
           $('#us3-lat').val(geoPos.coords.latitude)
+          mapOpts.location.latitude = geoPos.coords.latitude
+          mapOpts.location.longitude = geoPos.coords.longitude
+          mapOpts.zoom = 17
+          var gMap = $('#us3').locationpicker(mapOpts)
         });
+    } else {
+      var gMap = $('#us3').locationpicker(mapOpts)
     }
     </script>
   </body>
