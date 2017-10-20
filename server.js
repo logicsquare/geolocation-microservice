@@ -3,12 +3,37 @@ const Redis = require("redis")
 const bodyParser = require("body-parser")
 const { addMinutes } = require("date-fns")
 
+const http = require("http")
+const Faye = require("faye")
+
 const app = Express()
 const redis = Redis.createClient()
 
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
+app.use(Express.static(`${__dirname}/public`))
 
+const server = http.createServer(app)
+const bayeux = new Faye.NodeAdapter()
+bayeux.attach(server)
+
+bayeux.getClient()
+  .subscribe("/location/*")
+  .withChannel((id, data) => {
+    if (id && data.lng && data.lat) {
+      redis.geoadd("driver:locations", data.lng, data.lat, `id:${id}`)
+    }
+  })
+
+bayeux.getClient()
+  .subscribe("/heartbeat/*")
+  .withChannel((id) => {
+    if (id) {
+      const timeOutInMinutes = 10 // time outs after minimum 10 mins of inactivity
+      const timeOutStamp = addMinutes(Date.now(), timeOutInMinutes).valueOf()
+      redis.zadd("driver:activeuntill", timeOutStamp, `id:${id}`)
+    }
+  })
 
 app.post("/location", (req, res) => {
   const timeOutInMinutes = req.body.timeout || 10 // minimum 10 mins is default
@@ -55,6 +80,6 @@ app.get("/near", (req, res) => {
   })
 })
 
-app.listen(3000, () => {
+server.listen(3000, () => {
   console.log("Example app listening on port 3000!")
 })
