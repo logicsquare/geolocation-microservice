@@ -58,9 +58,9 @@ app.post("/location", (req, res) => {
 })
 
 app.get("/near", (req, res) => {
-  const myLat = req.query.lat
-  const myLng = req.query.lng
-  const radius = req.query.radius || 7 // eslint-disable-line prefer-destructuring
+  const myLat = parseFloat(req.query.lat)
+  const myLng = parseFloat(req.query.lng)
+  const radius = Number(req.query.radius) || 7 // eslint-disable-line prefer-destructuring
   const unit = req.query.unit || "km" // eslint-disable-line prefer-destructuring
 
   console.log("**********", myLat, myLng, radius, unit);
