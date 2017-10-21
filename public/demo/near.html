@@ -122,6 +122,12 @@
         error: function () {
           console.log("OOOOPPPPPSSSS..........Network error!");
           $(".disable-while-talking").prop("disabled", false)
+          clearInterval(promptInterval)
+          $("#alert-div").html(`
+          <div class="alert alert-danger">
+            <strong>☠☠☠ Network Error ☠☠☠</strong>
+          </div>
+          `)
         }
       })
     }
