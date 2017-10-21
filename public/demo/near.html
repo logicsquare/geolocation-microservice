@@ -6,6 +6,7 @@
 <body>
   
   <div class="container text-center" style="margin-top: 3em;">
+    <div id="alert-div"></div>
     <div class="row">
     <h3>Find Transports which matches the following criteria:</h3>
     <hr/>
@@ -54,7 +55,7 @@
     {{#drivers}}
     <tr>
       <td> {{id}} </td>}
-      <td data-driver-id="{{.}}">Lat: {{lat}}; Lng: {{lng}}</td>
+      <td data-driver-id="{{id}}">Lat: {{lat}}; Lng: {{lng}}</td>
     </tr>
     {{/drivers}}
   </script>
@@ -68,13 +69,29 @@
   </script>
   <script>
     var faye = new Faye.Client('http://localhost:3000/faye');
-    var subscriptions = {};
+    var subscription, promptInterval;
 
     var template = $('#template').html();
     Mustache.parse(template);   // optional, speeds up future uses
 
+    function promptRefresh() {
+      $("#alert-div").html("")
+      try {
+        clearInterval(promptInterval)
+      } catch (e) {
+        console.log("NON-FATAL WARNING: Unable to cancel promptInterval");
+      } finally {
+        promptInterval = setInterval(function () {
+          $("#alert-div").html(`<div class="alert alert-warning alert-dismissable">
+            <a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>
+            <strong>WARNING: </strong>Data might be out of date!
+            <button type="button" class="btn btn-xs btn-success pull-right clearfix" onclick="fetchData(renderTemplate);">Refresh Now</button>
+</div>`);
+        }, 1 * 60 * 1000) // 1 minute interval
+      }
+    }
+
     function fetchData(cb) {
-      console.log(subscriptions);
       $(".disable-while-talking").prop("disabled", true)
       var lat = $("#lat").val()
       var lng = $("#lng").val()
@@ -86,14 +103,20 @@
         url: `http://localhost:3000/near?lat=${lat}&lng=${lng}&radius=${radius}&unit=${unit}`,
         success: function (data) {
           console.log(data);
+          try {
+            subscription.cancel()
+          } catch (e) {
+            console.log("NON-FATAL WARNING: Unable to cancel exisiting subscriptions");
+          } finally {
+            subscription = faye
+            .subscribe("/location/*")
+            .withChannel((channel, message) => {
+              console.log("msg rcvd: ", channel, message);
+              $(`td[data-driver-id='${message.id}']`).html(`Lat: ${message.lat}; Lng: ${message.lng}`)
+            })
+          }
+          promptRefresh()
           $(".disable-while-talking").prop("disabled", false)
-          // Object.keys(subscriptions).forEach(id => subscriptions[id].cancel())
-          // subscriptions = {}
-          data.forEach((id) => {
-            // id = id.split(":")[1]
-            var s = faye.subscribe("/location/" + id, handleMessage)
-            subscriptions[id] = s
-          })
           cb(data)
         },
         error: function () {
@@ -106,11 +129,6 @@
     function renderTemplate(data) {
       var rendered = Mustache.render(template, { drivers: data });
       $("#target").html(rendered)
-    }
-
-    function handleMessage(message) { // faye subscription msg
-      console.log("handling msg.........");
-      $(`td[data-driver-id='${message.id}']`).html(`Lat: ${message.lat}; Lng: ${message.lng}`)
     }
 
      // at load / dom ready.......

@@ -27,18 +27,22 @@
   </script>
   <script>
     var faye = new Faye.Client('http://localhost:3000/faye');
-
-    $("#us3-id").val(Date.now());
-
+    
+    function updateLocation() {
+      faye.publish('/location/' + $('#us3-id').val(), { id: $('#us3-id').val(), lng: $('#us3-lon').val(), lat: $('#us3-lat').val() });
+    }
+    
     // send heartbeats (keep alive) every minute
     setInterval(function () {
       faye.publish("/heartbeat/" + $('#us3-id').val(), { timestamp: Date.now() })
-    }, 60 * 1000)
+    }, 1 * 60 * 1000)    
+
+    $("#us3-id").val(Date.now());
 
     var mapOpts = {
       location: {
-        latitude: 22.5726,
-        longitude: 88.3639
+        latitude: 22.5726,  // Kolkata
+        longitude: 88.3639  // Kolkata
       },
       radius: 0,
       inputBinding: {
@@ -51,17 +55,8 @@
       onchanged: function (currentLocation, radius, isMarkerDropped) {
         if (isMarkerDropped) {
           console.log("marker Drooped....");
-          faye.publish('/location/' + $('#us3-id').val(), { id: $('#us3-id').val(), lng: $('#us3-lon').val(), lat: $('#us3-lat').val() });
+          updateLocation()
         }
-        // $.ajax({
-        //   method: "POST",
-        //   url: "http://localhost:3000/location",
-        //   data: {
-        //     lng: $('#us3-lon').val(),
-        //     lat: $('#us3-lat').val(),
-        //     id: $('#us3-id').val(),
-        //   }
-        // })
       }
     }
 
@@ -74,9 +69,13 @@
           mapOpts.location.longitude = geoPos.coords.longitude
           mapOpts.zoom = 17
           var gMap = $('#us3').locationpicker(mapOpts)
+          // Publish initial location update:
+          updateLocation()
         });
     } else {
       var gMap = $('#us3').locationpicker(mapOpts)
+      // Publish initial location update:
+      updateLocation()
     }
     </script>
   </body>
