@@ -6,15 +6,17 @@ const { addMinutes } = require("date-fns")
 const http = require("http")
 const Faye = require("faye")
 
+const config = require("./config.js")
+
 const app = Express()
-const redis = Redis.createClient()
+const redis = Redis.createClient(config.redisUrl)
 
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 app.use(Express.static(`${__dirname}/public`))
 
 const server = http.createServer(app)
-const bayeux = new Faye.NodeAdapter({ mount: "/faye", timeout: 45 })
+const bayeux = new Faye.NodeAdapter({ mount: config.fayeMountPath, timeout: config.fayeTimeout })
 bayeux.attach(server)
 
 bayeux.getClient()
@@ -96,6 +98,6 @@ app.get("/near", (req, res) => {
   })
 })
 
-server.listen(3000, () => {
-  console.log("Example app listening on port 3000!")
+server.listen(config.PORT, () => {
+  console.log(`Example app listening on port ${config.PORT}`)
 })
