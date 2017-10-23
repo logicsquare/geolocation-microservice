@@ -13,9 +13,7 @@
   "author": "sayanriju <s26c.sayan@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "body-parser": "^1.18.2",
     "date-fns": "^1.29.0",
-    "express": "^4.16.2",
     "faye": "^1.2.4",
     "redis": "^2.8.0"
   },
