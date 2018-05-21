@@ -16,6 +16,8 @@ app.use(bodyParser.json())
 app.use(Express.static(`${__dirname}/public`))
 
 const server = http.createServer(app)
+
+/** Real time stuff */
 const bayeux = new Faye.NodeAdapter({ mount: config.fayeMountPath, timeout: config.fayeTimeout })
 bayeux.attach(server)
 
@@ -43,21 +45,81 @@ bayeux.getClient()
     }
   })
 
-app.post("/location", (req, res) => {
+/** Non-realtime */
+
+const checkAuthMiddleware = function (req, res, next) {
+  if (!config.requireAuth) return next()
+  try {
+    const token = req.get("authorization").split(" ").pop()
+    if (config.accessToken === token) return next()
+    throw new Error()
+  } catch (error) {
+    return res.status(403).send("INVALID OR MISSING ACCESS TOKEN")
+  }
+}
+
+/**
+ *
+ * @api {post} /location Upsert a Driver's location. Also updates the driver's last active status.
+ * @apiName UpsertDriverLocation
+ *
+ * @apiHeader {String} [Authorization] The Access Token in format "Token xxxxyyyyzzzz"
+ *
+ * @apiParam  {String} lng Current Longitude
+ * @apiParam  {String} lat Current Latitude
+ * @apiParam  {String} id Unique Driver _id
+ */
+app.post("/location", checkAuthMiddleware, (req, res) => {
   const timeOutInMinutes = req.body.timeout || 10 // minimum 10 mins is default
   const timeOutStamp = addMinutes(Date.now(), timeOutInMinutes).valueOf()
   if (!req.body.lng || !req.body.lat || !req.body.id) {
     return res.status(400).send("MISSING MANDATORY FIELDS IN REQUEST BODY")
   }
   console.log(req.body.lng, req.body.lat, req.body.id)
-  redis.geoadd("driver:locations", req.body.lng, req.body.lat, `id:${req.body.id}`, (err) => {
+  return redis.geoadd("driver:locations", req.body.lng, req.body.lat, `id:${req.body.id}`, (err) => {
     if (err) { return res.status(500).send("LOCATION NOT SAVED") }
     redis.zadd("driver:activeuntill", timeOutStamp, `id:${req.body.id}`) // no waiting!!
     return res.status(200).send("OK")
   })
 })
 
-app.get("/near", (req, res) => {
+/**
+ *
+ * @api {delete} /location/:id Remove a driver from being tracked (Take him off duty)
+ * @apiName DeleteDriverLocation
+ *
+ * @apiHeader {String} [Authorization] The Access Token in format "Token xxxxyyyyzzzz"
+ *
+ * @apiParam  {String} id Driver _id [URL Parameter]
+ */
+app.delete("/location/:id", checkAuthMiddleware, (req, res) => {
+  if (!req.params.id) {
+    return res.status(400).send("MISSING MANDATORY FIELDS IN REQUEST BODY")
+  }
+  return redis
+    .multi()
+    .zrem("driver:locations", `id:${req.params.id}`)
+    .zrem("driver:activeuntill", `id:${req.params.id}`)
+    .exec((err) => {
+      if (err) { return res.status(500).send("DRIVER NOT REMOVED") }
+      return res.status(200).send("OK")
+    })
+})
+
+/**
+ *
+ * @api {get} /near Find all Active drivers within a given radius from a given co-ordinate
+ * @apiName FindActiveDrivers
+ *
+ * @apiHeader {String} [Authorization] The Access Token in format "Token xxxxyyyyzzzz"
+ *
+ * @apiParam {number} myLng Longitude to center on [QUERY Parameter]
+ * @apiParam {number} myLat Latitude to center on [QUERY Parameter]
+ * @apiParam {number} [radius=7] Radius to search within [QUERY Parameter]
+ * @apiParam {Object} [unit=km] Unit of radius ( m for meters. km for kilometers. mi for miles. ft for feet. ) [QUERY Parameter]
+ */
+
+app.get("/near", checkAuthMiddleware, (req, res) => {
   const myLat = parseFloat(req.query.lat)
   const myLng = parseFloat(req.query.lng)
   const radius = Number(req.query.radius) || 7 // eslint-disable-line prefer-destructuring
@@ -65,11 +127,11 @@ app.get("/near", (req, res) => {
 
   console.log("**********", myLat, myLng, radius, unit);
   if (!myLat || !myLng) {
-    return res.status(400).send("MISSING MANDATORY FIELDS `lat` & `lng`") 
+    return res.status(400).send("MISSING MANDATORY FIELDS `lat` & `lng`")
   }
 
   // First, find all inactive :
-  redis.zrangebyscore("driver:activeuntill", "-inf", Date.now(), (err0, inactives) => {
+  return redis.zrangebyscore("driver:activeuntill", "-inf", Date.now(), (err0, inactives) => {
     console.log("Inactives: ", inactives)
     // Next, remove all those inactive  from geolocations
     redis.zrem("driver:locations", ...inactives, (err1) => {
