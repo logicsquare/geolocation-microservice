@@ -68,6 +68,7 @@ const checkAuthMiddleware = function (req, res, next) {
  * @apiParam  {String} lng Current Longitude
  * @apiParam  {String} lat Current Latitude
  * @apiParam  {String} id Unique Driver _id
+ * @apiParam  {String} [timeout=10] Timeout in Minutes
  */
 app.post("/location", checkAuthMiddleware, (req, res) => {
   const timeOutInMinutes = req.body.timeout || 10 // minimum 10 mins is default

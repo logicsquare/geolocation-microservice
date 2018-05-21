@@ -1,6 +1,6 @@
 module.exports = {
   PORT: process.env.PORT || 3000,
-  requireAuth: process.env.REQUIRE_AUTH || false,
+  requireAuth: process.env.REQUIRE_AUTH || true,
   accessToken: process.env.ACCESS_TOKEN || "5c52033473c84e598f139ae462545595",
   jwtSecret: process.env.JWT_SECRET || "top secret",
   redisUrl: process.env.REDIS_URL || null,
