@@ -114,8 +114,8 @@ app.delete("/location/:id", checkAuthMiddleware, (req, res) => {
  *
  * @apiHeader {String} [Authorization] The Access Token in format "Token xxxxyyyyzzzz"
  *
- * @apiParam {number} myLng Longitude to center on [QUERY Parameter]
- * @apiParam {number} myLat Latitude to center on [QUERY Parameter]
+ * @apiParam {number} lng Longitude to center on [QUERY Parameter]
+ * @apiParam {number} lat Latitude to center on [QUERY Parameter]
  * @apiParam {number} [radius=7] Radius to search within [QUERY Parameter]
  * @apiParam {Object} [unit=km] Unit of radius ( m for meters. km for kilometers. mi for miles. ft for feet. ) [QUERY Parameter]
  */
